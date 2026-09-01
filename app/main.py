@@ -14,6 +14,7 @@ import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import ALLOWED_EXTENSIONS
 from app.kml_parser import parse_contour_file
 from app.dem_builder import build_dem
 from app.catchment import (
@@ -46,10 +47,10 @@ def health_check():
 
 
 @app.post("/analyzeContour")
-async def analyze_contour(file: UploadFile = File(...)):
+async def analyze_contour(contour_map: UploadFile = File(...)):
     """
-    Accepts a contour map file (.kml or .kmz), analyzes the terrain, and
-    returns:
+    Accepts a contour map file (.kml or .kmz) under the form field name
+    'contour_map', analyzes the terrain, and returns:
       - a recommended pond location (lon/lat)
       - the estimated catchment area draining into that location
       - a boundary polygon of the catchment (for map overlay)
@@ -58,16 +59,16 @@ async def analyze_contour(file: UploadFile = File(...)):
     Nothing about the sample map is hard-coded - every value below is
     derived from whatever contour file is uploaded.
     """
-    if not file.filename.lower().endswith((".kml", ".kmz")):
+    if not contour_map.filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Please upload a .kml or .kmz file.")
 
-    file_bytes = await file.read()
+    file_bytes = await contour_map.read()
 
     start = time.time()
 
     # 1. Parse contour lines out of the uploaded file
     try:
-        contours = parse_contour_file(file.filename, file_bytes)
+        contours = parse_contour_file(contour_map.filename, file_bytes)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not parse contour file: {e}")
 
@@ -98,7 +99,7 @@ async def analyze_contour(file: UploadFile = File(...)):
     elapsed = round(time.time() - start, 2)
 
     return {
-        "input_file": file.filename,
+        "input_file": contour_map.filename,
         "processing_time_seconds": elapsed,
         "dem_resolution_meters": round(dem.cell_size, 2),
         "grid_size": {"rows": dem.elevation.shape[0], "cols": dem.elevation.shape[1]},
