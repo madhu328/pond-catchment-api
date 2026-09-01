@@ -12,6 +12,7 @@ or POST a .kml/.kmz file to http://127.0.0.1:8000/analyzeContour
 
 import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import ALLOWED_EXTENSIONS
@@ -43,7 +44,74 @@ app.add_middleware(
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "message": "Village Pond Catchment API is running"}
+    return {"status": "ok", "message": "Village Pond Catchment API is running. Use POST /analyzeContour or POST /findCatchment to submit KML files."}
+
+
+@app.get("/analyzeContour", response_class=HTMLResponse)
+@app.get("/findCatchment", response_class=HTMLResponse)
+def get_analyze_contour_page():
+    return """<!DOCTYPE html>
+<html>
+<head>
+    <title>Village Pond Catchment Analysis API</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 40px; }
+        .container { max-width: 800px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { color: #38bdf8; margin-top: 0; }
+        p { color: #94a3b8; line-height: 1.6; }
+        .box { background: #0f172a; border: 2px dashed #38bdf8; border-radius: 8px; padding: 25px; text-align: center; margin: 20px 0; }
+        input[type=file] { margin-bottom: 15px; color: #cbd5e1; display: block; margin: 0 auto 15px auto; }
+        button { background: #0284c7; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        button:hover { background: #0369a1; }
+        pre { background: #0f172a; padding: 15px; border-radius: 6px; overflow-x: auto; color: #4ade80; border: 1px solid #334155; max-height: 400px; }
+        .badge { background: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        .note { background: #1e3a8a; border-left: 4px solid #3b82f6; padding: 12px; margin-bottom: 20px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 Village Pond Catchment Analysis API</h1>
+        <div class="note">
+            <strong>Note for API Testers / Postman:</strong> This endpoint accepts <code>POST</code> requests with <code>multipart/form-data</code> parameter key <code>contour_map</code>.
+        </div>
+        <p>Upload a contour map file (<span class="badge">.kml</span> or <span class="badge">.kmz</span>) to analyze terrain, compute flow direction & accumulation, locate optimal pond placement, and estimate catchment boundary.</p>
+        
+        <div class="box">
+            <h3>Test API in Browser</h3>
+            <form id="uploadForm">
+                <input type="file" id="kmlFile" name="contour_map" accept=".kml,.kmz" required><br>
+                <button type="submit">Upload & Analyze Contour Map</button>
+            </form>
+        </div>
+
+        <div id="result" style="display:none;">
+            <h3>Analysis Result (JSON):</h3>
+            <pre id="jsonOutput"></pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('kmlFile');
+            const formData = new FormData();
+            formData.append('contour_map', fileInput.files[0]);
+            
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('jsonOutput').textContent = 'Processing terrain analysis (parsing KML, building DEM, D8 flow calculation)...';
+            
+            try {
+                const res = await fetch('/analyzeContour', { method: 'POST', body: formData });
+                const data = await res.json();
+                document.getElementById('jsonOutput').textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('jsonOutput').textContent = 'Error: ' + err;
+            }
+        };
+    </script>
+</body>
+</html>"""
+
 
 
 @app.post("/analyzeContour")
