@@ -1,17 +1,12 @@
 """
 main.py
 -------
-FastAPI application exposing the /analyzeContour endpoint.
-
-Run locally with:
-    uvicorn app.main:app --reload
-
-Then open http://127.0.0.1:8000/docs for interactive API docs (Swagger UI),
-or POST a .kml/.kmz file to http://127.0.0.1:8000/analyzeContour
+FastAPI application exposing /analyzeContour and /findCatchment endpoints.
+Supports both GET (interactive HTML upload interface) and POST (JSON response for API clients/Postman).
 """
 
 import time
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,7 +28,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow the frontend (running on a different port/origin) to call this API.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,16 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-def health_check():
-    return {"status": "ok", "message": "Village Pond Catchment API is running. Use POST /analyzeContour or POST /findCatchment to submit KML files."}
-
-
-@app.get("/analyzeContour", response_class=HTMLResponse)
-@app.get("/findCatchment", response_class=HTMLResponse)
-def get_analyze_contour_page():
-    return """<!DOCTYPE html>
+HTML_UI = """<!DOCTYPE html>
 <html>
 <head>
     <title>Village Pond Catchment Analysis API</title>
@@ -72,20 +57,20 @@ def get_analyze_contour_page():
     <div class="container">
         <h1>🌊 Village Pond Catchment Analysis API</h1>
         <div class="note">
-            <strong>Note for API Testers / Postman:</strong> This endpoint accepts <code>POST</code> requests with <code>multipart/form-data</code> parameter key <code>contour_map</code>.
+            <strong>API Endpoint:</strong> <code>POST /analyzeContour</code> (Parameter: <code>contour_map</code>)
         </div>
-        <p>Upload a contour map file (<span class="badge">.kml</span> or <span class="badge">.kmz</span>) to analyze terrain, compute flow direction & accumulation, locate optimal pond placement, and estimate catchment boundary.</p>
+        <p>Upload a contour map file (<span class="badge">.kml</span> or <span class="badge">.kmz</span>) to analyze terrain, compute D8 flow direction & accumulation, locate optimal pond placement, and estimate catchment area.</p>
         
         <div class="box">
-            <h3>Test API in Browser</h3>
+            <h3>Upload & Analyze Contour Map</h3>
             <form id="uploadForm">
                 <input type="file" id="kmlFile" name="contour_map" accept=".kml,.kmz" required><br>
-                <button type="submit">Upload & Analyze Contour Map</button>
+                <button type="submit">Analyze Contour Map</button>
             </form>
         </div>
 
         <div id="result" style="display:none;">
-            <h3>Analysis Result (JSON):</h3>
+            <h3>API Output (JSON):</h3>
             <pre id="jsonOutput"></pre>
         </div>
     </div>
@@ -98,7 +83,7 @@ def get_analyze_contour_page():
             formData.append('contour_map', fileInput.files[0]);
             
             document.getElementById('result').style.display = 'block';
-            document.getElementById('jsonOutput').textContent = 'Processing terrain analysis (parsing KML, building DEM, D8 flow calculation)...';
+            document.getElementById('jsonOutput').textContent = 'Processing terrain analysis...';
             
             try {
                 const res = await fetch('/analyzeContour', { method: 'POST', body: formData });
@@ -113,23 +98,17 @@ def get_analyze_contour_page():
 </html>"""
 
 
-
-@app.post("/analyzeContour")
-async def analyze_contour(
+@app.api_route("/", methods=["GET", "POST"])
+@app.api_route("/analyzeContour", methods=["GET", "POST"])
+@app.api_route("/findCatchment", methods=["GET", "POST"])
+async def handle_contour_request(
+    request: Request,
     contour_map: UploadFile = File(None),
     file: UploadFile = File(None),
 ):
-    """
-    Accepts a contour map file (.kml or .kmz) under form field 'contour_map'
-    (or 'file'), analyzes the terrain, and returns:
-      - a recommended pond location (lon/lat)
-      - the estimated catchment area draining into that location
-      - a boundary polygon of the catchment (for map overlay)
-      - basic elevation statistics of the analyzed region
+    if request.method == "GET":
+        return HTMLResponse(content=HTML_UI)
 
-    Nothing about the sample map is hard-coded - every value below is
-    derived from whatever contour file is uploaded.
-    """
     upload = contour_map or file
     if upload is None:
         raise HTTPException(
@@ -141,7 +120,6 @@ async def analyze_contour(
         raise HTTPException(status_code=400, detail="Please upload a .kml or .kmz file.")
 
     file_bytes = await upload.read()
-
     start = time.time()
 
     # 1. Parse contour lines out of the uploaded file
@@ -200,12 +178,3 @@ async def analyze_contour(
             "catchment area as the input."
         ),
     }
-
-
-@app.post("/findCatchment")
-async def find_catchment(
-    contour_map: UploadFile = File(None),
-    file: UploadFile = File(None),
-):
-    """Alias for /analyzeContour endpoint."""
-    return await analyze_contour(contour_map=contour_map, file=file)
