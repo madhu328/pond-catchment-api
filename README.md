@@ -36,7 +36,7 @@ Interactive Swagger docs are auto-generated at `http://127.0.0.1:8000/docs`.
 
 ## 2. API Documentation
 
-### `POST /analyzeContour`
+### `POST /analyzeContour` or `POST /findCatchment`
 
 Accepts a contour map file and returns the recommended pond location with its
 catchment information.
@@ -44,18 +44,18 @@ catchment information.
 **Request:** `multipart/form-data`
 | Field | Type | Description |
 |-------|------|--------------|
-| `file` | file | A `.kml` or `.kmz` contour map |
+| `contour_map` | file | A `.kml` or `.kmz` contour map (also accepts `file` key as fallback) |
 
 **Example (curl):**
 ```bash
 curl -X POST http://127.0.0.1:8000/analyzeContour \
-  -F "file=@contours_1m.kml"
+  -F "contour_map=@contours_1m.kml"
 ```
 
 **Example (Python):**
 ```python
 import requests
-files = {"file": open("contours_1m.kml", "rb")}
+files = {"contour_map": ("contours_1m.kml", open("contours_1m.kml", "rb"), "application/vnd.google-earth.kml+xml")}
 r = requests.post("http://127.0.0.1:8000/analyzeContour", files=files)
 print(r.json())
 ```

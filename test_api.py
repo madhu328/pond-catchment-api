@@ -9,6 +9,7 @@ Then run:
     python test_api.py path/to/contours_1m.kml
 """
 
+import os
 import sys
 import json
 import requests
@@ -22,8 +23,9 @@ def main():
         sys.exit(1)
 
     file_path = sys.argv[1]
+    file_name = os.path.basename(file_path)
     with open(file_path, "rb") as f:
-        files = {"file": (file_path, f)}
+        files = {"contour_map": (file_name, f, "application/vnd.google-earth.kml+xml")}
         response = requests.post(API_URL, files=files)
 
     print("Status code:", response.status_code)

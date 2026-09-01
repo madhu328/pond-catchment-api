@@ -47,10 +47,13 @@ def health_check():
 
 
 @app.post("/analyzeContour")
-async def analyze_contour(contour_map: UploadFile = File(...)):
+async def analyze_contour(
+    contour_map: UploadFile = File(None),
+    file: UploadFile = File(None),
+):
     """
-    Accepts a contour map file (.kml or .kmz) under the form field name
-    'contour_map', analyzes the terrain, and returns:
+    Accepts a contour map file (.kml or .kmz) under form field 'contour_map'
+    (or 'file'), analyzes the terrain, and returns:
       - a recommended pond location (lon/lat)
       - the estimated catchment area draining into that location
       - a boundary polygon of the catchment (for map overlay)
@@ -59,16 +62,23 @@ async def analyze_contour(contour_map: UploadFile = File(...)):
     Nothing about the sample map is hard-coded - every value below is
     derived from whatever contour file is uploaded.
     """
-    if not contour_map.filename.lower().endswith(ALLOWED_EXTENSIONS):
+    upload = contour_map or file
+    if upload is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing file. Please upload a .kml or .kmz file under form parameter 'contour_map'."
+        )
+
+    if not upload.filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Please upload a .kml or .kmz file.")
 
-    file_bytes = await contour_map.read()
+    file_bytes = await upload.read()
 
     start = time.time()
 
     # 1. Parse contour lines out of the uploaded file
     try:
-        contours = parse_contour_file(contour_map.filename, file_bytes)
+        contours = parse_contour_file(upload.filename, file_bytes)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not parse contour file: {e}")
 
@@ -99,7 +109,7 @@ async def analyze_contour(contour_map: UploadFile = File(...)):
     elapsed = round(time.time() - start, 2)
 
     return {
-        "input_file": contour_map.filename,
+        "input_file": upload.filename,
         "processing_time_seconds": elapsed,
         "dem_resolution_meters": round(dem.cell_size, 2),
         "grid_size": {"rows": dem.elevation.shape[0], "cols": dem.elevation.shape[1]},
@@ -122,3 +132,12 @@ async def analyze_contour(contour_map: UploadFile = File(...)):
             "catchment area as the input."
         ),
     }
+
+
+@app.post("/findCatchment")
+async def find_catchment(
+    contour_map: UploadFile = File(None),
+    file: UploadFile = File(None),
+):
+    """Alias for /analyzeContour endpoint."""
+    return await analyze_contour(contour_map=contour_map, file=file)
