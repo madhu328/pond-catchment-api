@@ -98,17 +98,21 @@ HTML_UI = """<!DOCTYPE html>
 </html>"""
 
 
-@app.api_route("/", methods=["GET", "POST"])
-@app.api_route("/analyzeContour", methods=["GET", "POST"])
-@app.api_route("/findCatchment", methods=["GET", "POST"])
+@app.get("/", response_class=HTMLResponse)
+@app.get("/analyzeContour", response_class=HTMLResponse)
+@app.get("/findCatchment", response_class=HTMLResponse)
+async def get_ui():
+    return HTMLResponse(content=HTML_UI)
+
+
+@app.post("/")
+@app.post("/analyzeContour")
+@app.post("/findCatchment")
 async def handle_contour_request(
     request: Request,
     contour_map: UploadFile = File(None),
     file: UploadFile = File(None),
 ):
-    if request.method == "GET":
-        return HTMLResponse(content=HTML_UI)
-
     upload = contour_map or file
     if upload is None:
         raise HTTPException(
