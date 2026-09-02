@@ -142,14 +142,14 @@ def build_docx():
     overview_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     overview_rows = [
         ("GitHub Repository", "https://github.com/madhu328/pond-catchment-api"),
-        ("Primary API Endpoint (Network / TA)", "http://10.50.33.238:3313/analyzeContour"),
+        ("Primary API Endpoint (24/7 Remote SSH)", "http://10.1.75.51:3313/analyzeContour"),
+        ("Remote SSH System", "student@10.1.75.51 (Port 2313)"),
         ("Local Machine Endpoint", "http://localhost:3313/analyzeContour"),
-        ("Public WAN Endpoint", "http://103.147.138.252:3313/analyzeContour"),
-        ("Alias API Endpoint", "http://10.50.33.238:3313/findCatchment"),
+        ("Alias API Endpoint", "http://10.1.75.51:3313/findCatchment"),
         ("Required Form Field", "contour_map (File upload: .kml or .kmz)"),
         ("HTTP Method", "POST"),
-        ("Interactive Docs (Swagger UI)", "http://10.50.33.238:3313/docs (or http://localhost:3313/docs)"),
-        ("Interactive Upload Interface", "http://10.50.33.238:3313/ (or http://localhost:3313/)")
+        ("Interactive Docs (Swagger UI)", "http://10.1.75.51:3313/docs"),
+        ("Interactive Upload Interface", "http://10.1.75.51:3313/")
     ]
 
     for idx, (k, v) in enumerate(overview_rows):
@@ -271,7 +271,7 @@ def build_docx():
     add_h1("4. API Specification & Documentation")
 
     add_h2("cURL Command Example")
-    curl_str = """curl -X POST "http://10.50.33.238:3313/analyzeContour" \\
+    curl_str = """curl -X POST "http://10.1.75.51:3313/analyzeContour" \\
   -F "contour_map=@contours_1m.kml" """
     add_code_block(curl_str)
 
@@ -280,7 +280,7 @@ def build_docx():
     postman_p.add_run("1. Set HTTP Method to ").font.color.rgb = DARK_TEXT
     postman_p.add_run("POST").bold = True
     postman_p.add_run(".\n2. Enter URL: ")
-    postman_p.add_run("http://10.50.33.238:3313/analyzeContour").bold = True
+    postman_p.add_run("http://10.1.75.51:3313/analyzeContour").bold = True
     postman_p.add_run(".\n3. Under the ")
     postman_p.add_run("Body").bold = True
     postman_p.add_run(" tab, select ")

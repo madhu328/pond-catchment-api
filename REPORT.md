@@ -13,15 +13,15 @@
 | Metric / Parameter | Value / Details |
 | :--- | :--- |
 | **GitHub Repository** | `https://github.com/madhu328/pond-catchment-api` |
-| **Primary API Endpoint (Network / TA Access)** | `http://10.50.33.238:3313/analyzeContour` |
+| **Primary API Endpoint (24/7 SSH Server)** | `http://10.1.75.51:3313/analyzeContour` |
+| **SSH System Details** | `student@10.1.75.51` (Port 2313) |
 | **Local Machine Endpoint** | `http://localhost:3313/analyzeContour` |
-| **Public WAN Endpoint** | `http://103.147.138.252:3313/analyzeContour` |
-| **Alias Endpoint** | `http://10.50.33.238:3313/findCatchment` |
+| **Alias Endpoint** | `http://10.1.75.51:3313/findCatchment` |
 | **Required Form Field** | `contour_map` (File upload: `.kml` or `.kmz`) |
 | **Fallback Form Field** | `file` |
 | **HTTP Method** | `POST` |
-| **Interactive Docs (Swagger UI)**| `http://10.50.33.238:3313/docs` (or `http://localhost:3313/docs`) |
-| **Interactive Upload Interface**| `http://10.50.33.238:3313/` (or `http://localhost:3313/`) |
+| **Interactive Docs (Swagger UI)**| `http://10.1.75.51:3313/docs` |
+| **Interactive Upload Interface**| `http://10.1.75.51:3313/` |
 
 ---
 
