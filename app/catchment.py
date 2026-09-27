@@ -150,3 +150,54 @@ def catchment_boundary_lonlat(dem, catchment_cells):
     hull = MultiPoint(points).convex_hull
     hull_coords = list(hull.exterior.coords)
     return [list(dem.local_to_lonlat(x, y)) for x, y in hull_coords]
+
+
+def calculate_expected_water_volume(area_m2: float, rainfall_mm: float = 1000.0, runoff_coeff: float = 0.35):
+    """
+    Calculates expected annual runoff water volume using the Rational Method:
+    V = C * P * A
+
+    Parameters:
+    - area_m2: Catchment area in square meters (A)
+    - rainfall_mm: Annual rainfall in millimeters (P)
+    - runoff_coeff: Runoff coefficient C (0.15 to 0.60 depending on soil/land cover)
+
+    Returns dict with volume in m3, Liters, Million Liters, and per-capita community impact.
+    """
+    rainfall_meters = rainfall_mm / 1000.0
+    volume_m3 = area_m2 * rainfall_meters * runoff_coeff
+    volume_liters = volume_m3 * 1000.0
+    volume_million_liters = volume_m3 / 1000.0
+
+    # Impact estimation: A typical rural family of 5 uses ~750 Liters/day (150L/person/day)
+    # Annual domestic supply capacity (days of water for N households)
+    households_served_for_100_days = int(volume_liters / (750.0 * 100))
+
+    return {
+        "rainfall_mm": round(rainfall_mm, 1),
+        "runoff_coefficient": round(runoff_coeff, 2),
+        "expected_volume_m3": round(volume_m3, 2),
+        "expected_volume_liters": round(volume_liters, 0),
+        "expected_volume_million_liters": round(volume_million_liters, 3),
+        "estimated_households_served": max(1, households_served_for_100_days),
+    }
+
+
+def calculate_pond_dimensions(expected_volume_m3: float, recommended_depth_m: float = 3.0):
+    """
+    Estimates optimal pond engineering dimensions for capturing the expected runoff.
+    """
+    storage_capacity_m3 = round(expected_volume_m3 * 0.85, 2)  # 85% capture factor for safety
+    surface_area_m2 = round(storage_capacity_m3 / recommended_depth_m, 2)
+    length_m = round((surface_area_m2 * 1.25) ** 0.5, 1)
+    width_m = round(surface_area_m2 / max(length_m, 1.0), 1)
+
+    return {
+        "target_storage_capacity_m3": storage_capacity_m3,
+        "recommended_depth_m": recommended_depth_m,
+        "surface_area_m2": surface_area_m2,
+        "estimated_length_m": length_m,
+        "estimated_width_m": width_m,
+        "embankment_slope": "1:1.5",
+    }
+

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JalDrishti — AI Village Pond & Catchment Analysis Platform</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Leaflet Geoman Drawing Plugin -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.2/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.14.2/dist/leaflet-geoman.min.js"></script>
+
+    <!-- FontAwesome & Chart.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Top Header Navigation -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="brand-logo">
+                <i class="fa-solid fa-water waves-icon"></i>
+            </div>
+            <div class="brand-text">
+                <h1>JalDrishti <span>v2.0</span></h1>
+                <p>AI-Powered Village Pond & Catchment Hydrology Planner</p>
+            </div>
+        </div>
+
+        <div class="nav-stats">
+            <div class="stat-pill">
+                <span class="status-dot online"></span>
+                <span class="stat-label">System Engine:</span>
+                <span class="stat-val">Fast D8 Hydrology Grid</span>
+            </div>
+            <div class="stat-pill">
+                <i class="fa-solid fa-cloud-sun-rain"></i>
+                <span class="stat-label">Model:</span>
+                <span class="stat-val">Rational Method Runoff</span>
+            </div>
+        </div>
+
+        <div class="nav-actions">
+            <button class="btn btn-secondary" id="btnPresets">
+                <i class="fa-solid fa-layer-group"></i> Presets
+            </button>
+            <button class="btn btn-primary" id="btnExportGeoJSON" disabled>
+                <i class="fa-solid fa-download"></i> Export GeoJSON
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="app-layout">
+        <!-- Left Sidebar / Control Drawer -->
+        <aside class="sidebar sidebar-left" id="leftDrawer">
+            <div class="sidebar-header">
+                <h3><i class="fa-solid fa-sliders"></i> Land Selection & Control</h3>
+                <button class="toggle-drawer-btn" id="toggleLeftDrawer"><i class="fa-solid fa-chevron-left"></i></button>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- Selection Mode Tabs -->
+                <div class="tab-container">
+                    <button class="tab-btn active" data-tab="drawMode">
+                        <i class="fa-solid fa-draw-polygon"></i> Draw Map
+                    </button>
+                    <button class="tab-btn" data-tab="uploadMode">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload KML
+                    </button>
+                    <button class="tab-btn" data-tab="presetMode">
+                        <i class="fa-solid fa-map-location-dot"></i> Presets
+                    </button>
+                </div>
+
+                <!-- Tab 1: Draw Map Selection -->
+                <div class="tab-content active" id="drawMode">
+                    <div class="instruction-card">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <p>Click the <strong>Polygon Tool</strong> on the top-left map toolbar to draw your land boundary directly on the interactive satellite/terrain map.</p>
+                    </div>
+
+                    <div class="selection-status-box" id="drawStatusBox">
+                        <span class="status-icon text-amber"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                        <div class="status-info">
+                            <h4>No Area Selected</h4>
+                            <p>Draw a polygon or select a preset to analyze catchment.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Upload KML File -->
+                <div class="tab-content" id="uploadMode">
+                    <div class="upload-dropzone" id="dropzone">
+                        <i class="fa-solid fa-file-code upload-icon"></i>
+                        <h4>Drag & Drop Contour File</h4>
+                        <p>Supports <code>.kml</code> or <code>.kmz</code> elevation maps</p>
+                        <input type="file" id="kmlFileInput" accept=".kml,.kmz" hidden>
+                        <button class="btn btn-outline" id="browseFileBtn">Browse Files</button>
+                    </div>
+                    <div class="file-name-display" id="fileNameDisplay" style="display: none;">
+                        <i class="fa-solid fa-file-check"></i> <span id="uploadedFileName">contours_1m.kml</span>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Presets -->
+                <div class="tab-content" id="presetMode">
+                    <div class="preset-list">
+                        <div class="preset-card active" data-preset="raipur">
+                            <div class="preset-icon"><i class="fa-solid fa-mountain"></i></div>
+                            <div class="preset-details">
+                                <h4>Raipur Basin Contour Map</h4>
+                                <p>8.5 km² Contour survey, 1m resolution (Chhattisgarh)</p>
+                            </div>
+                        </div>
+
+                        <div class="preset-card" data-preset="durg">
+                            <div class="preset-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                            <div class="preset-details">
+                                <h4>Durg Agricultural Watershed</h4>
+                                <p>12.4 Hectare rural farming basin with drainage valley</p>
+                            </div>
+                        </div>
+
+                        <div class="preset-card" data-preset="hilly">
+                            <div class="preset-icon"><i class="fa-solid fa-hill-rockslide"></i></div>
+                            <div class="preset-details">
+                                <h4>Micro-Hilly Catchment</h4>
+                                <p>High runoff slope region for water harvesting</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hydrological Simulation Parameters -->
+                <div class="section-divider"></div>
+                <div class="param-section">
+                    <h4><i class="fa-solid fa-cloud-showers-heavy text-cyan"></i> Hydrological Parameters</h4>
+
+                    <!-- Rainfall Slider -->
+                    <div class="param-group">
+                        <div class="param-header">
+                            <label for="rainfallRange">Annual Monsoon Rainfall (P)</label>
+                            <span class="param-badge" id="rainfallValue">1000 mm</span>
+                        </div>
+                        <input type="range" id="rainfallRange" min="300" max="2500" step="50" value="1000">
+                        <div class="preset-pills">
+                            <button class="pill-btn" data-val="600">Drought (600mm)</button>
+                            <button class="pill-btn active" data-val="1000">Avg (1000mm)</button>
+                            <button class="pill-btn" data-val="1500">Monsoon (1500mm)</button>
+                        </div>
+                    </div>
+
+                    <!-- Soil / Runoff Coefficient Selector -->
+                    <div class="param-group">
+                        <div class="param-header">
+                            <label for="runoffCoeffSelect">Soil & Land Cover (Runoff C)</label>
+                            <span class="param-badge" id="runoffCoeffValue">C = 0.35</span>
+                        </div>
+                        <select id="runoffCoeffSelect" class="form-select">
+                            <option value="0.35" selected>Loam / Agricultural Farmland (C = 0.35)</option>
+                            <option value="0.50">Clay Soil / Heavy Runoff (C = 0.50)</option>
+                            <option value="0.20">Sandy Soil / High Infiltration (C = 0.20)</option>
+                            <option value="0.60">Rocky Slope / Mountainous (C = 0.60)</option>
+                            <option value="0.15">Dense Forest / Woodland (C = 0.15)</option>
+                        </select>
+                    </div>
+
+                    <!-- Pond Target Depth Slider -->
+                    <div class="param-group">
+                        <div class="param-header">
+                            <label for="depthRange">Recommended Pond Depth</label>
+                            <span class="param-badge" id="depthValue">3.0 m</span>
+                        </div>
+                        <input type="range" id="depthRange" min="2.0" max="5.0" step="0.5" value="3.0">
+                    </div>
+                </div>
+
+                <!-- Submit / Execute Button -->
+                <button class="btn btn-action" id="btnAnalyze">
+                    <i class="fa-solid fa-bolt-lightning"></i> Run Catchment Analysis
+                </button>
+            </div>
+        </aside>
+
+        <!-- Center Viewport (Interactive Leaflet Map Canvas) -->
+        <section class="map-viewport">
+            <div id="map"></div>
+
+            <!-- Floating Map Controls Overlay -->
+            <div class="map-overlay-controls">
+                <div class="basemap-selector">
+                    <button class="basemap-btn active" data-layer="satellite" title="Satellite Imagery">
+                        <i class="fa-solid fa-earth-asia"></i> Satellite
+                    </button>
+                    <button class="basemap-btn" data-layer="topo" title="Topographic Map">
+                        <i class="fa-solid fa-mountain-sun"></i> Topo
+                    </button>
+                    <button class="basemap-btn" data-layer="dark" title="Dark Canvas">
+                        <i class="fa-solid fa-moon"></i> Dark
+                    </button>
+                    <button class="basemap-btn" data-layer="streets" title="OpenStreetMap">
+                        <i class="fa-solid fa-map"></i> Streets
+                    </button>
+                </div>
+            </div>
+
+            <!-- Map Status & Quick Notification Bar -->
+            <div class="map-toast" id="mapToast">
+                <i class="fa-solid fa-spinner fa-spin toast-icon"></i>
+                <span id="toastMessage">Initializing interactive hydrological map...</span>
+            </div>
+        </section>
+
+        <!-- Right Sidebar / Hydrological Results Drawer -->
+        <aside class="sidebar sidebar-right" id="rightDrawer">
+            <div class="sidebar-header">
+                <h3><i class="fa-solid fa-chart-pie"></i> Analysis Results</h3>
+                <button class="toggle-drawer-btn" id="toggleRightDrawer"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+
+            <div class="sidebar-content" id="resultsContent">
+                <!-- Welcome / Initial State Prompt -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon"><i class="fa-solid fa-compass-drafting"></i></div>
+                    <h3>Ready for Analysis</h3>
+                    <p>Select a land area on the map or click <strong>Run Catchment Analysis</strong> to generate hydrological results and map overlays.</p>
+                </div>
+
+                <!-- Dynamic Results Dashboard -->
+                <div class="results-dashboard" id="resultsDashboard" style="display: none;">
+                    <!-- Key Hydrological Summary Cards Grid -->
+                    <div class="metrics-grid">
+                        <!-- Card 1: Suggested Pond Site -->
+                        <div class="metric-card highlight-card">
+                            <div class="card-icon text-cyan"><i class="fa-solid fa-location-dot"></i></div>
+                            <div class="card-data">
+                                <span class="card-label">Suggested Pond Location</span>
+                                <div class="card-value-group">
+                                    <span class="card-val" id="resPondCoords">21.2461° N, 81.2893° E</span>
+                                </div>
+                                <span class="card-subtext" id="resPondElevation"><i class="fa-solid fa-arrow-trend-down"></i> Elevation: 268.0 m (Lowest Terrain Point)</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Catchment Area -->
+                        <div class="metric-card">
+                            <div class="card-icon text-emerald"><i class="fa-solid fa-draw-polygon"></i></div>
+                            <div class="card-data">
+                                <span class="card-label">Delineated Catchment Area</span>
+                                <div class="card-value-group">
+                                    <span class="card-val" id="resCatchmentAreaHa">3.57 ha</span>
+                                    <span class="card-unit">(<span id="resCatchmentAreaM2">35,700</span> m²)</span>
+                                </div>
+                                <span class="card-subtext" id="resContributingCells">357 DEM Grid Cells Drained</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Expected Water Volume -->
+                        <div class="metric-card highlight-blue">
+                            <div class="card-icon text-blue"><i class="fa-solid fa-droplet"></i></div>
+                            <div class="card-data">
+                                <span class="card-label">Expected Annual Water Volume</span>
+                                <div class="card-value-group">
+                                    <span class="card-val" id="resVolumeM3">12,495 m³</span>
+                                    <span class="card-unit">(<span id="resVolumeML">12.50</span> Million Liters)</span>
+                                </div>
+                                <span class="card-subtext" id="resVolumeLiters">12,495,000 Liters Total Harvestable</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Community Impact -->
+                        <div class="metric-card">
+                            <div class="card-icon text-amber"><i class="fa-solid fa-people-roof"></i></div>
+                            <div class="card-data">
+                                <span class="card-label">Community Water Security Impact</span>
+                                <div class="card-value-group">
+                                    <span class="card-val" id="resHouseholdsServed">166 Households</span>
+                                </div>
+                                <span class="card-subtext">Supplied with 750L/day for 100 dry season days</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommended Pond Engineering Dimensions -->
+                    <div class="section-card">
+                        <h4><i class="fa-solid fa-ruler-combined text-cyan"></i> Recommended Pond Engineering Design</h4>
+                        <div class="spec-grid">
+                            <div class="spec-item">
+                                <span class="spec-label">Design Storage Capacity</span>
+                                <span class="spec-val" id="specCapacity">10,620 m³</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Target Pond Depth</span>
+                                <span class="spec-val" id="specDepth">3.0 m</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Recommended Surface Area</span>
+                                <span class="spec-val" id="specArea">3,540 m²</span>
+                            </div>
+                            <div class="spec-item">
+                                <span class="spec-label">Estimated Dimensions</span>
+                                <span class="spec-val" id="specDimensions">66.5 m × 53.2 m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Chart 1: Elevation Profile -->
+                    <div class="section-card">
+                        <h4><i class="fa-solid fa-chart-line text-emerald"></i> Catchment Elevation Profile</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="elevationChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Chart 2: Monthly Storage Hydrograph -->
+                    <div class="section-card">
+                        <h4><i class="fa-solid fa-chart-column text-blue"></i> Seasonal Runoff & Storage Hydrograph</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="hydrographChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- App JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

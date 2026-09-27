@@ -1,72 +1,100 @@
-# Village Pond Catchment Analysis Backend — Phase 2
+# 🌊 JalDrishti — AI Village Pond & Catchment Hydrology Platform
 
-Backend API that accepts a contour map (KML/KMZ), analyzes the terrain, identifies a
-suitable pond location, and returns the estimated catchment area draining into it.
+An interactive Web Application & FastAPI Backend for **AI-Based Village Pond Planning & Catchment Hydrology Analysis**.
 
-Part of: **AI-based Village Pond Planning System** — Assignment 1, Phase 2.
+It allows users to select land areas on an interactive map (or upload KML/KMZ contour maps), computes terrain D8 flow direction and accumulation, identifies optimal low-lying pond placement, delineates the catchment basin boundary, and calculates harvestable water volume ($V = C \times P \times A$).
 
 ---
 
-## 1. Installation Guide
+## 🌟 Key Features
 
-### Requirements
-- Python 3.10+
+1. **Interactive Web Front-End (SPA)**:
+   - Built with modern glassmorphism design, dark theme, and Leaflet.js interactive maps.
+   - **4 Basemap Options**: Satellite Imagery (Esri World Imagery), Topographic Terrain (OpenTopoMap), Dark Canvas (CartoDB), and OpenStreetMap.
+   - **3 Selection Modes**:
+     - ✏️ **Interactive Map Drawing**: Draw custom land boundary polygons directly on the map.
+     - 📁 **KML/KMZ Contour Upload**: Drag & drop contour elevation maps.
+     - 📌 **Regional Presets**: One-click demo datasets (Raipur Basin, Durg Watershed, Hilly Catchment).
 
-### Steps
+2. **Map Overlays & Visualizations**:
+   - 📍 **Suggested Pond Location Pin**: Animated glowing marker with elevation, coordinates, and recommended design depth.
+   - 🔷 **Catchment Area Boundary**: Colored semi-transparent GeoJSON polygon overlaid on the map.
+   - 💧 **Expected Water Volume Badge**: Overlaid directly at the pond site.
+
+3. **Hydrological Calculation & Simulation**:
+   - **Rational Method Runoff**: $V = C \times P \times A$ ($m^3$, Liters, Million Liters).
+   - **Real-Time Sliders**: Adjust Annual Rainfall ($P$ in mm), Soil/Land Runoff Coefficient ($C$), and Pond Target Depth ($m$) with instant client-side recalculation.
+   - **Community Impact**: Calculates estimated rural households served for 100 dry-season days.
+   - **Pond Engineering Specifications**: Storage capacity, surface area, top length/width, embankment slope.
+
+4. **Analytics & Deliverables**:
+   - Interactive Chart.js graphs: Catchment Elevation Profile & Monthly Water Harvest Hydrograph.
+   - 📥 **Export GeoJSON**: Download GeoJSON feature collections of Pond Pins and Catchment Polygons.
+
+---
+
+## 🚀 Quick Start
+
+### 1. Installation
 ```bash
-# 1. Clone the repo
-git clone <your-github-repo-url>
+# Clone repository
+git clone <repository-url>
 cd pond_backend
 
-# 2. Create a virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate      # on Windows: venv\Scripts\activate
+# Activate virtual environment
+source venv/bin/activate
 
-# 3. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
-
-# 4. Run the server
-uvicorn app.main:app --reload
 ```
 
-The API will be live at `http://127.0.0.1:8000`.
-Interactive Swagger docs are auto-generated at `http://127.0.0.1:8000/docs`.
+### 2. Running the Application
+```bash
+# Option A: Helper runner script (default port 3313)
+python run_server.py 3313
+
+# Option B: Direct uvicorn
+uvicorn app.main:app --host 0.0.0.0 --port 3313
+```
+
+Open your browser at **`http://127.0.0.1:3313/`** to view the interactive map web app!
 
 ---
 
-## 2. API Documentation
+## 📡 API Endpoints
 
 ### `POST /analyzeContour` or `POST /findCatchment`
+Accepts a KML/KMZ contour map and returns terrain flow & hydrological volume metrics.
 
-Accepts a contour map file and returns the recommended pond location with its
-catchment information.
+**Parameters (`multipart/form-data`):**
+- `contour_map`: `.kml` or `.kmz` file
+- `rainfall_mm`: (optional, default `1000.0`) Annual monsoon rainfall in mm.
+- `runoff_coefficient`: (optional, default `0.35`) Soil runoff coefficient $C$.
 
-**Request:** `multipart/form-data`
-| Field | Type | Description |
-|-------|------|--------------|
-| `contour_map` | file | A `.kml` or `.kmz` contour map (also accepts `file` key as fallback) |
+### `POST /analyzeSelectedArea`
+Accepts a user-selected polygon drawn on the map.
 
-**Example (curl):**
-```bash
-curl -X POST http://127.0.0.1:8000/analyzeContour \
-  -F "contour_map=@contours_1m.kml"
+**Request Body (`application/json`):**
+```json
+{
+  "polygon_lonlat": [
+    [81.2850, 21.2430],
+    [81.2930, 21.2430],
+    [81.2930, 21.2490],
+    [81.2850, 21.2490],
+    [81.2850, 21.2430]
+  ],
+  "rainfall_mm": 1000.0,
+  "runoff_coefficient": 0.35
+}
 ```
 
-**Example (Python):**
-```python
-import requests
-files = {"contour_map": ("contours_1m.kml", open("contours_1m.kml", "rb"), "application/vnd.google-earth.kml+xml")}
-r = requests.post("http://127.0.0.1:8000/analyzeContour", files=files)
-print(r.json())
-```
-
-**Response (200 OK):**
+**Response Example (200 OK):**
 ```json
 {
   "input_file": "contours_1m.kml",
-  "processing_time_seconds": 4.44,
+  "processing_time_seconds": 1.25,
   "dem_resolution_meters": 10.0,
-  "grid_size": { "rows": 264, "cols": 324 },
   "recommended_pond_location": {
     "longitude": 81.2893,
     "latitude": 21.2461,
@@ -76,124 +104,58 @@ print(r.json())
     "area_m2": 35700.0,
     "area_hectares": 3.57,
     "num_contributing_cells": 357,
-    "elevation_min_m": 268.0,
-    "elevation_max_m": 284.88,
     "boundary_polygon_lonlat": [[81.288, 21.245], ["..."]]
   },
-  "note": "Runoff volume and rainfall-based storage estimates will be integrated in the next phase using a rainfall API, using this catchment area as the input."
+  "expected_water_volume": {
+    "rainfall_mm": 1000.0,
+    "runoff_coefficient": 0.35,
+    "expected_volume_m3": 12495.0,
+    "expected_volume_liters": 12495000.0,
+    "expected_volume_million_liters": 12.495,
+    "estimated_households_served": 166
+  },
+  "recommended_pond_dimensions": {
+    "target_storage_capacity_m3": 10620.75,
+    "recommended_depth_m": 3.0,
+    "surface_area_m2": 3540.25,
+    "estimated_length_m": 66.5,
+    "estimated_width_m": 53.2,
+    "embankment_slope": "1:1.5"
+  }
 }
 ```
 
-The full sample response for the provided `contours_1m.kml` is saved in
-[`sample_output.json`](./sample_output.json).
+---
 
-### `GET /`
-Simple health check — returns `{"status": "ok"}`.
+## 🧮 Hydrological Method & Algorithm
+
+1. **DEM Grid Interpolation**: Scipy linear grid interpolation converts scattered contour samples to a 10m regular Digital Elevation Model grid.
+2. **D8 Flow Direction**: Determines steepest downhill neighbor for all cells.
+3. **Flow Accumulation**: Walks cells from highest to lowest elevation, accumulating total upstream drainage cells.
+4. **Pond Site Selection**: Identifies maximum flow convergence sink while excluding boundary edge artifacts.
+5. **Catchment Delineation**: Reverse graph traversal from chosen pond cell collects all contributing upstream cells.
+6. **Water Volume Calculation**: Rational Method formula:
+   $$V = C \times P \times A$$
+   where $A$ = Catchment Area ($m^2$), $P$ = Annual Monsoon Rainfall ($m$), $C$ = Runoff Coefficient.
 
 ---
 
-## 3. Catchment Estimation Approach
-
-The problem: given only a contour map (lines of equal elevation), figure out where
-water naturally collects and how much land area drains into that point.
-
-**Step 1 — Parse the contour file.**
-Each contour line in the KML is a `Placemark` with a `LineString`, and its elevation
-value is stored in the placemark's `name` (e.g. `"277.0"`). We extract every
-(longitude, latitude, elevation) point from every line. (`app/kml_parser.py`)
-
-**Step 2 — Build a DEM (Digital Elevation Model).**
-A DEM is just a regular grid of elevation values. We don't have one directly — we
-only have scattered elevation samples along contour lines. So:
-- Lon/lat is converted to local meters (simple equirectangular projection) so
-  distances/areas are physically meaningful.
-- `scipy.interpolate.griddata` interpolates the scattered elevation samples onto a
-  regular grid (default 10m cells, auto-coarsened for very large maps so the grid
-  never gets unreasonably big). (`app/dem_builder.py`)
-
-**Step 3 — D8 Flow Direction.**
-For every grid cell, we look at its 8 neighbours and find the one with the steepest
-downhill slope — that's the direction water flows from that cell. This is the
-standard "D8" algorithm used in hydrology/GIS tools like ArcGIS or QGIS.
-(`app/catchment.py :: compute_flow_direction`)
-
-**Step 4 — Flow Accumulation.**
-We process cells from highest to lowest elevation, and each cell passes its
-accumulated "flow count" downstream to its D8 neighbour. By the time we reach the
-lowest cells, we know exactly how many upstream cells' water passes through each
-cell — i.e., where water naturally converges.
-(`app/catchment.py :: compute_flow_accumulation`)
-
-**Step 5 — Pond Site Selection.**
-We pick the cell (away from the map edges, to avoid boundary artifacts) with the
-highest flow accumulation — the point where the most water converges naturally.
-This is a reasonable, low-lying, high-convergence spot for a pond.
-(`app/catchment.py :: select_pond_site`)
-
-**Step 6 — Catchment Delineation.**
-Starting from the chosen pond cell, we walk backwards through the flow-direction
-graph (a reverse BFS: "which cells eventually flow into this one?") to collect every
-contributing cell. Catchment area = number of contributing cells × cell area.
-(`app/catchment.py :: delineate_catchment`)
-
-**Step 7 — Return results.**
-Pond location, catchment area (m² and hectares), elevation range of the catchment,
-and a convex-hull boundary polygon (for map overlay) are returned as JSON.
-
-Nothing about the sample map's coordinates or elevations is hard-coded anywhere —
-every number in the response is derived from whatever contour file is uploaded, so
-the same code works on any other contour map with the same structure.
-
----
-
-## 4. Demonstration (Sample Contour Map)
-
-Using the provided `contours_1m.kml` (1-meter contour interval, ~8.5 km² area,
-elevation range 267m–298m):
-
-- The API correctly identified a natural drainage valley running through the
-  mapped area (visible as the low-elevation blue channel below).
-- Recommended pond site: **(81.2893° E, 21.2461° N)** at elevation **268m**
-  (near the lowest point in the map).
-- Estimated catchment area: **35,700 m² (3.57 hectares)**, made up of 357
-  contributing grid cells.
-
-![Demo output](./demo_output.png)
-*Blue/green = low elevation (natural drainage valley), cyan = catchment area,
-red star = recommended pond site.*
-
----
-
-## 5. Project Structure
+## 📁 Project Structure
 
 ```
 pond_backend/
 ├── app/
-│   ├── main.py           # FastAPI app + /analyzeContour route
-│   ├── kml_parser.py      # Parses KML/KMZ contour files
-│   ├── dem_builder.py     # Builds a DEM grid from contour lines
-│   └── catchment.py       # D8 flow direction, accumulation, catchment delineation
+│   ├── main.py              # FastAPI app & static SPA routes
+│   ├── kml_parser.py         # KML/KMZ contour parser
+│   ├── dem_builder.py        # DEM elevation grid generator
+│   └── catchment.py          # D8 flow algorithms & water volume logic
+├── static/
+│   ├── index.html           # Single Page Application HTML layout
+│   ├── styles.css           # Glassmorphism design system
+│   └── app.js               # Leaflet map, drawing tools & Chart.js logic
+├── test_backend_direct.py   # Unit test runner
+├── sample_output.json         # Example API output JSON
 ├── requirements.txt
-├── test_api.py             # Simple script to test the endpoint
-├── sample_output.json      # Example response for contours_1m.kml
-├── demo_output.png         # Visualization of the demo run
+├── run_server.py            # Server launcher script
 └── README.md
 ```
-
-## 6. Extensibility to Future Phases
-
-- The DEM and catchment logic doesn't assume anything about the sample map's size,
-  location, or elevation range, so it generalizes to any KML/KMZ contour file with
-  the same structure (elevation stored in the Placemark name).
-- The `catchment.area_m2` value returned here is exactly what the next phase needs
-  as input to the Rational Method runoff formula (`Q = C × I × A`) once rainfall
-  data is pulled in from a rainfall API.
-- KMZ (zipped KML) support is already handled, in case future contour maps are
-  provided in that format.
-
-## 7. AI Tool Usage Disclosure
-
-Claude (Anthropic) was used to help design the algorithmic approach (D8 flow
-direction/accumulation for catchment delineation), scaffold the FastAPI project
-structure, and debug/test the implementation against the provided sample contour
-map. All code was reviewed and understood before submission.

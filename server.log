@@ -1,0 +1,20 @@
+INFO:     Started server process [26157]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:3313 (Press CTRL+C to quit)
+Starting server on 0.0.0.0:3313...
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET /static/styles.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59076 - "GET /static/app.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43066 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43066 - "GET /static/styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43078 - "GET /static/app.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43078 - "GET /favicon.ico HTTP/1.1" 404 Not Found
