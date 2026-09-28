@@ -216,6 +216,11 @@
                 </div>
             </div>
 
+            <!-- Live Mouse Cursor Coordinates Tracker Badge -->
+            <div class="live-coords-bar" id="liveCoordsDisplay">
+                <i class="fa-solid fa-crosshairs text-cyan"></i> <strong>Live Pointer:</strong> Hover on map for lat/lon
+            </div>
+
             <!-- Map Status & Quick Notification Bar -->
             <div class="map-toast" id="mapToast">
                 <i class="fa-solid fa-spinner fa-spin toast-icon"></i>
@@ -248,7 +253,7 @@
                             <div class="card-data">
                                 <span class="card-label">Suggested Pond Location</span>
                                 <div class="card-value-group">
-                                    <span class="card-val" id="resPondCoords">21.2461° N, 81.2893° E</span>
+                                    <span class="card-val" id="resPondCoords">21.246100° N, 81.289300° E</span>
                                 </div>
                                 <span class="card-subtext" id="resPondElevation"><i class="fa-solid fa-arrow-trend-down"></i> Elevation: 268.0 m (Lowest Terrain Point)</span>
                             </div>
@@ -290,6 +295,14 @@
                                 </div>
                                 <span class="card-subtext">Supplied with 750L/day for 100 dry season days</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- All Discovered Pond Locations Card -->
+                    <div class="section-card" id="allPondsSection">
+                        <h4><i class="fa-solid fa-map-pin text-cyan"></i> Identified Pond Sites (<span id="pondCountBadge">1</span>)</h4>
+                        <div class="all-ponds-list" id="allPondsListContainer">
+                            <!-- Populated dynamically via app.js -->
                         </div>
                     </div>
 

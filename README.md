@@ -6,7 +6,21 @@ It allows users to select land areas on an interactive map (or upload KML/KMZ co
 
 ---
 
+## 🚀 24/7 Deployed Server Links for Professor Submission
+
+The backend and frontend application are deployed and running **24/7** on the assigned campus SSH server nodes:
+
+| System Name | SSH Port | Password | 24/7 Application URL | Status |
+|---|---|---|---|---|
+| **stu29_sys1** | `2313` | `madhu64` | **`http://10.1.75.51:3313/`** | ✅ **ONLINE (24/7 Active)** |
+| **stu29_sys2** | `2314` | `madhu64` | **`http://10.1.75.51:3314/`** | ✅ **ONLINE (24/7 Active)** |
+| **stu29_sys3** | `2315` | `madhu64` | **`http://10.1.75.51:3315/`** | ✅ **ONLINE (24/7 Deployed)** |
+| **stu29_sys4** | `2316` | `madhu64` | **`http://10.1.75.51:3316/`** | ✅ **ONLINE (24/7 Deployed)** |
+
+---
+
 ## 🌟 Key Features
+
 
 1. **Interactive Web Front-End (SPA)**:
    - Built with modern glassmorphism design, dark theme, and Leaflet.js interactive maps.

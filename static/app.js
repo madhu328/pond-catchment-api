@@ -8,14 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --------------------------------------------------------------------------
     let map = null;
     let baseLayers = {};
-    let drawnItems = null;
     let currentDrawnPolygon = null; // [[lon, lat], ...]
     let activeAnalysisData = null;
     let selectedKmlFile = null;
 
-    let pondMarker = null;
+    let pondMarkers = [];
     let catchmentPolygonLayer = null;
     let selectedLandPolygonLayer = null;
+    let clickInspectMarker = null;
 
     let elevationChart = null;
     let hydrographChart = null;
@@ -109,13 +109,54 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDrawStatus(false);
         });
 
-        showToast('Map initialized. Draw land polygon or pick a preset.', 'info');
+        // Live Cursor Coordinates Tracker
+        map.on('mousemove', (e) => {
+            const liveCoordDisplay = document.getElementById('liveCoordsDisplay');
+            if (liveCoordDisplay) {
+                liveCoordDisplay.innerHTML = `<i class="fa-solid fa-crosshairs text-cyan"></i> <strong>Live Pointer:</strong> Lat: ${e.latlng.lat.toFixed(6)}° N | Lon: ${e.latlng.lng.toFixed(6)}° E`;
+            }
+        });
+
+        // Click on map to inspect coordinates
+        map.on('click', (e) => {
+            if (map.pm.globalDrawModeEnabled()) return;
+            if (clickInspectMarker) map.removeLayer(clickInspectMarker);
+
+            const clickIcon = L.divIcon({
+                className: 'click-inspect-marker',
+                html: `<div class="inspect-pin"><i class="fa-solid fa-location-dot"></i></div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            clickInspectMarker = L.marker(e.latlng, { icon: clickIcon }).addTo(map);
+            clickInspectMarker.bindPopup(`
+                <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
+                    <strong style="color: #0284c7;"><i class="fa-solid fa-map-pin"></i> Inspected Map Point</strong><br>
+                    <strong>Latitude:</strong> ${e.latlng.lat.toFixed(6)}° N<br>
+                    <strong>Longitude:</strong> ${e.latlng.lng.toFixed(6)}° E
+                </div>
+            `).openPopup();
+        });
+
+        showToast('Map initialized. Auto-generating terrain flow analysis...', 'info');
     }
 
     // --------------------------------------------------------------------------
     // UI Event Handlers
     // --------------------------------------------------------------------------
     function initUI() {
+        // Header Presets Button Quick Link
+        const btnPresetsHeader = document.getElementById('btnPresets');
+        if (btnPresetsHeader) {
+            btnPresetsHeader.addEventListener('click', () => {
+                const presetTabBtn = document.querySelector('.tab-btn[data-tab="presetMode"]');
+                if (presetTabBtn) presetTabBtn.click();
+                const drawer = document.getElementById('leftDrawer');
+                if (drawer) drawer.style.transform = 'translateX(0)';
+            });
+        }
+
         // Tab Switcher
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -127,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById(targetTab).classList.add('active');
             });
         });
+
 
         // Basemap Switcher Buttons
         document.querySelectorAll('.basemap-btn').forEach(btn => {
@@ -283,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Preset Loaded: Micro-Hilly Catchment Region', 'info');
         }
         updateDrawStatus(true, 4);
+        runAnalysis();
     }
 
     function updateDrawStatus(hasPolygon, vertexCount = 0) {
@@ -372,14 +415,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --------------------------------------------------------------------------
-    // Map Overlays Rendering
+    // Map Overlays & Live Pointer Rendering
     // --------------------------------------------------------------------------
     function renderResultsOnMap(data) {
-        // Clear existing map layers
-        if (pondMarker) map.removeLayer(pondMarker);
+        // Clear existing map layers & markers
+        if (pondMarkers && pondMarkers.length > 0) {
+            pondMarkers.forEach(m => map.removeLayer(m));
+        }
+        pondMarkers = [];
+
         if (catchmentPolygonLayer) map.removeLayer(catchmentPolygonLayer);
 
-        const pond = data.recommended_pond_location;
+        const primaryPond = data.recommended_pond_location;
         const catchment = data.catchment;
 
         // 1. Render Catchment Boundary Polygon
@@ -404,30 +451,86 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `);
 
-            map.fitBounds(catchmentPolygonLayer.getBounds(), { padding: [50, 50] });
+            map.fitBounds(catchmentPolygonLayer.getBounds(), { padding: [60, 60] });
         }
 
-        // 2. Render Suggested Pond Location Pin Marker with Glowing Ring
-        const customIcon = L.divIcon({
-            className: 'custom-pond-marker',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
+        // 2. Render Live Pulsing Pond Pointer Markers + Lat/Lon Badges for ALL identified pond sites
+        const ponds = (data.all_ponds && data.all_ponds.length > 0) ? data.all_ponds : [{
+            rank: 1,
+            type: "Primary Storage Pond",
+            badge: "PRIMARY POND",
+            color: "#38bdf8",
+            latitude: primaryPond.latitude,
+            longitude: primaryPond.longitude,
+            elevation_m: primaryPond.elevation_m,
+            expected_water_volume: data.expected_water_volume,
+            catchment_area_ha: catchment.area_hectares,
+            catchment_area_m2: catchment.area_m2
+        }];
+
+        ponds.forEach((p, idx) => {
+            const pColor = p.color || '#38bdf8';
+            const badgeTitle = p.badge || `POND SITE #${p.rank || idx + 1}`;
+            const coordBadgeText = `${badgeTitle}: ${p.latitude.toFixed(6)}° N, ${p.longitude.toFixed(6)}° E`;
+
+            const customIcon = L.divIcon({
+                className: `custom-pond-marker-wrapper rank-${p.rank || 1}`,
+                html: `
+                    <div class="pond-beacon-ring" style="border-color: ${pColor};"></div>
+                    <div class="pond-beacon-pulse" style="background: ${pColor}; opacity: 0.5;"></div>
+                    <div class="pond-marker-pin" style="background: linear-gradient(135deg, ${pColor}, #0284c7); box-shadow: 0 0 20px ${pColor};">
+                        <i class="fa-solid ${p.rank === 1 ? 'fa-droplet' : (p.rank === 2 ? 'fa-filter' : 'fa-water')}"></i>
+                    </div>
+                    <div class="pond-live-coord-badge" style="border-color: ${pColor}; color: ${pColor};">
+                        <i class="fa-solid fa-location-dot"></i> ${coordBadgeText}
+                    </div>
+                `,
+                iconSize: [280, 80],
+                iconAnchor: [140, 22]
+            });
+
+            const m = L.marker([p.latitude, p.longitude], { icon: customIcon }).addTo(map);
+
+            const vol = p.expected_water_volume || data.expected_water_volume;
+            const catchmentAreaHa = p.catchment_area_ha || catchment.area_hectares;
+            const catchmentAreaM2 = p.catchment_area_m2 || catchment.area_m2;
+
+            const popupContent = `
+                <div class="live-pond-popup">
+                    <div class="popup-header">
+                        <i class="fa-solid fa-location-dot" style="color: ${pColor};"></i>
+                        <h4 style="color: ${pColor};">${(p.type || 'SUGGESTED POND LOCATION').toUpperCase()}</h4>
+                    </div>
+                    <div class="popup-coords-badge" style="border: 1px solid ${pColor};">
+                        <span class="coord-item"><strong>LAT:</strong> ${p.latitude.toFixed(6)}° N</span>
+                        <span class="coord-item"><strong>LON:</strong> ${p.longitude.toFixed(6)}° E</span>
+                    </div>
+                    <div class="popup-body">
+                        <div class="popup-row">
+                            <span>Site Designation:</span>
+                            <strong style="color: ${pColor};">${p.type || 'Primary Pond'}</strong>
+                        </div>
+                        <div class="popup-row">
+                            <span>Terrain Elevation:</span>
+                            <strong>${p.elevation_m} meters</strong>
+                        </div>
+                        <div class="popup-row">
+                            <span>Catchment Basin:</span>
+                            <strong>${catchmentAreaHa} ha (${catchmentAreaM2.toLocaleString()} m²)</strong>
+                        </div>
+                        <div class="popup-divider"></div>
+                        <div class="popup-highlight" style="border-left-color: ${pColor};">
+                            <span>Expected Harvestable Volume:</span>
+                            <strong class="vol-text" style="color: ${pColor};">${vol.expected_volume_m3.toLocaleString()} m³ (${vol.expected_volume_million_liters} ML)</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            m.bindPopup(popupContent, { maxWidth: 320, className: 'custom-leaflet-popup' });
+            if (p.rank === 1) m.openPopup();
+            pondMarkers.push(m);
         });
-
-        pondMarker = L.marker([pond.latitude, pond.longitude], { icon: customIcon }).addTo(map);
-
-        const vol = data.expected_water_volume;
-        pondMarker.bindPopup(`
-            <div style="font-family: sans-serif; font-size: 13px; color: #0f172a; line-height: 1.5; padding: 4px;">
-                <h4 style="color: #0284c7; margin: 0 0 6px 0; font-size: 14px;"><i class="fa-solid fa-location-dot"></i> Recommended Pond Site</h4>
-                <strong>Coordinates:</strong> ${pond.latitude.toFixed(4)}° N, ${pond.longitude.toFixed(4)}° E<br>
-                <strong>Elevation:</strong> ${pond.elevation_m} meters<br>
-                <strong>Catchment Area:</strong> ${catchment.area_hectares} ha<br>
-                <hr style="margin: 6px 0; border: none; border-top: 1px solid #e2e8f0;">
-                <strong style="color: #0369a1;">Expected Water Volume:</strong><br>
-                <span style="font-size: 15px; font-weight: bold; color: #0284c7;">${vol.expected_volume_m3.toLocaleString()} m³</span> (${vol.expected_volume_million_liters} ML)
-            </div>
-        `).openPopup();
     }
 
     // --------------------------------------------------------------------------
@@ -442,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const vol = data.expected_water_volume;
         const dims = data.recommended_pond_dimensions;
 
-        document.getElementById('resPondCoords').textContent = `${pond.latitude.toFixed(4)}° N, ${pond.longitude.toFixed(4)}° E`;
+        document.getElementById('resPondCoords').textContent = `${pond.latitude.toFixed(6)}° N, ${pond.longitude.toFixed(6)}° E`;
         document.getElementById('resPondElevation').innerHTML = `<i class="fa-solid fa-arrow-trend-down text-cyan"></i> Elevation: ${pond.elevation_m} m (Natural Drainage Sink)`;
 
         document.getElementById('resCatchmentAreaHa').textContent = `${catchment.area_hectares} ha`;
@@ -454,6 +557,56 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resVolumeLiters').textContent = `${vol.expected_volume_liters.toLocaleString()} Liters Total Harvestable`;
 
         document.getElementById('resHouseholdsServed').textContent = `${vol.estimated_households_served} Rural Households`;
+
+        // Render Identified Ponds List in Right Sidebar
+        const pondCountBadge = document.getElementById('pondCountBadge');
+        const pondsContainer = document.getElementById('allPondsListContainer');
+        if (pondCountBadge && pondsContainer) {
+            const ponds = (data.all_ponds && data.all_ponds.length > 0) ? data.all_ponds : [{
+                rank: 1,
+                type: "Primary Storage Pond",
+                badge: "PRIMARY POND",
+                color: "#38bdf8",
+                latitude: pond.latitude,
+                longitude: pond.longitude,
+                elevation_m: pond.elevation_m,
+                expected_water_volume: vol,
+                catchment_area_ha: catchment.area_hectares,
+                catchment_area_m2: catchment.area_m2
+            }];
+
+            pondCountBadge.textContent = ponds.length;
+            pondsContainer.innerHTML = ponds.map((p, idx) => `
+                <div class="pond-site-card" data-idx="${idx}" style="border-left: 3px solid ${p.color || '#38bdf8'};">
+                    <div class="pond-card-header">
+                        <span class="pond-card-title" style="color: ${p.color || '#38bdf8'};">
+                            <i class="fa-solid ${p.rank === 1 ? 'fa-droplet' : (p.rank === 2 ? 'fa-filter' : 'fa-water')}"></i> ${p.type}
+                        </span>
+                        <span class="pond-card-rank">Rank #${p.rank || idx + 1}</span>
+                    </div>
+                    <div class="pond-card-coords">
+                        <strong>Lat:</strong> ${p.latitude.toFixed(6)}° N | <strong>Lon:</strong> ${p.longitude.toFixed(6)}° E
+                    </div>
+                    <div class="pond-card-stats">
+                        <span>Elev: <strong>${p.elevation_m}m</strong></span>
+                        <span>Area: <strong>${p.catchment_area_ha || catchment.area_hectares} ha</strong></span>
+                        <span>Vol: <strong>${(p.expected_water_volume ? p.expected_water_volume.expected_volume_m3 : vol.expected_volume_m3).toLocaleString()} m³</strong></span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click listeners to focus map on clicked pond card
+            document.querySelectorAll('.pond-site-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const idx = parseInt(card.getAttribute('data-idx'));
+                    if (pondMarkers[idx] && ponds[idx]) {
+                        const targetPond = ponds[idx];
+                        map.flyTo([targetPond.latitude, targetPond.longitude], 17);
+                        pondMarkers[idx].openPopup();
+                    }
+                });
+            });
+        }
 
         document.getElementById('specCapacity').textContent = `${dims.target_storage_capacity_m3.toLocaleString()} m³`;
         document.getElementById('specDepth').textContent = `${dims.recommended_depth_m} m`;
@@ -515,7 +668,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const catchment = data.catchment;
         const minE = catchment.elevation_min_m || 268;
         const maxE = catchment.elevation_max_m || 285;
-        const midE = (minE + maxE) / 2;
+
+        // Use real backend elevation profile if available
+        let labels = ['Ridge Peak', 'Upper Catchment', 'Mid Slope', 'Lower Valley', 'Pond Site'];
+        let profileValues = [maxE, maxE - (maxE - minE)*0.25, (minE + maxE)/2, minE + (maxE - minE)*0.15, minE];
+
+        if (catchment.elevation_profile && Array.isArray(catchment.elevation_profile) && catchment.elevation_profile.length > 0) {
+            labels = catchment.elevation_profile.map(p => p.label);
+            profileValues = catchment.elevation_profile.map(p => p.elevation_m);
+        }
 
         // 1. Elevation Profile Chart
         const ctxElev = document.getElementById('elevationChart').getContext('2d');
@@ -524,10 +685,10 @@ document.addEventListener('DOMContentLoaded', () => {
         elevationChart = new Chart(ctxElev, {
             type: 'line',
             data: {
-                labels: ['Ridge Peak', 'Upper Catchment', 'Mid Slope', 'Lower Valley', 'Pond Site'],
+                labels: labels,
                 datasets: [{
                     label: 'Elevation Profile (m)',
-                    data: [maxE, maxE - (maxE - minE)*0.25, midE, minE + (maxE - minE)*0.15, minE],
+                    data: profileValues,
                     borderColor: '#34d399',
                     backgroundColor: 'rgba(52, 211, 153, 0.15)',
                     fill: true,
@@ -552,6 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
 
         // 2. Hydrograph Chart
         const ctxHydro = document.getElementById('hydrographChart').getContext('2d');
@@ -613,6 +775,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     properties: {
                         name: "Suggested Pond Location",
+                        latitude: pond.latitude,
+                        longitude: pond.longitude,
                         elevation_m: pond.elevation_m,
                         expected_water_volume_m3: vol.expected_volume_m3,
                         expected_water_volume_liters: vol.expected_volume_liters
@@ -662,7 +826,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initialize Map and UI
+    // Initialize Map, UI, and Auto-Run Initial Terrain Analysis
     initMap();
     initUI();
+
+    // Auto-run analysis on page load so pond marker pointer & catchment area are instantly visible
+    setTimeout(() => {
+        runAnalysis();
+    }, 500);
 });

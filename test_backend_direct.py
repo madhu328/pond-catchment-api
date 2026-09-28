@@ -9,7 +9,10 @@ from app.main import app, handle_contour_request, analyze_selected_area, MapArea
 from fastapi.datastructures import UploadFile
 import io
 
-async def test_direct():
+def test_direct():
+    asyncio.run(_async_test_direct())
+
+async def _async_test_direct():
     print("1. Testing handle_contour_request with contours_1m.kml...")
     with open("contours_1m.kml", "rb") as f:
         file_bytes = f.read()

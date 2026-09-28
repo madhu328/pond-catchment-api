@@ -39,12 +39,26 @@ def test_routes():
         catchment = data["catchment"]
         vol = data["expected_water_volume"]
 
+        assert "elevation_profile" in catchment, "Missing elevation_profile in catchment response"
         print(f"   [SUCCESS] Pond Site: ({pond['latitude']:.4f}, {pond['longitude']:.4f}) Elev: {pond['elevation_m']}m")
         print(f"   [SUCCESS] Catchment Area: {catchment['area_hectares']} ha ({catchment['area_m2']} m²)")
         print(f"   [SUCCESS] Expected Water Volume: {vol['expected_volume_m3']} m³ ({vol['expected_volume_million_liters']} Million Liters)")
         print(f"   [SUCCESS] Households Served: {vol['estimated_households_served']} households")
+        print(f"   [SUCCESS] Elevation Profile Points: {len(catchment['elevation_profile'])} points extracted.")
 
-    print("3. Testing POST /analyzeSelectedArea (Interactive Map Polygon)...")
+
+    print("3. Testing POST /findCatchment (Alias endpoint)...")
+    if os.path.exists(kml_path):
+        with open(kml_path, "rb") as f:
+            res_alias = client.post(
+                "/findCatchment",
+                files={"contour_map": ("contours_1m.kml", f, "application/vnd.google-earth.kml+xml")},
+                data={"rainfall_mm": 1000.0, "runoff_coefficient": 0.35}
+            )
+        assert res_alias.status_code == 200, f"Expected 200, got {res_alias.status_code}"
+        print("   [SUCCESS] POST /findCatchment alias endpoint passed.")
+
+    print("4. Testing POST /analyzeSelectedArea (Interactive Map Polygon)...")
     poly_payload = {
         "polygon_lonlat": [
             [81.2850, 21.2430],
@@ -63,9 +77,11 @@ def test_routes():
     assert area_data["input_type"] == "interactive_map_selection"
     assert "recommended_pond_location" in area_data
     assert "expected_water_volume" in area_data
+    assert "elevation_profile" in area_data["catchment"]
 
     print(f"   [SUCCESS] Interactive Map Area Analysis Passed.")
     print("ALL UNIT TESTS PASSED SUCCESSFULLY!")
 
 if __name__ == "__main__":
     test_routes()
+

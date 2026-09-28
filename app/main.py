@@ -9,7 +9,7 @@ import os
 import time
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -21,11 +21,14 @@ from app.catchment import (
     compute_flow_direction,
     compute_flow_accumulation,
     select_pond_site,
+    select_all_pond_sites,
     delineate_catchment,
     catchment_boundary_lonlat,
     calculate_expected_water_volume,
     calculate_pond_dimensions,
+    extract_elevation_profile,
 )
+
 
 app = FastAPI(
     title="Village Pond Catchment & Hydrological Analysis API",
@@ -55,11 +58,14 @@ class MapAreaRequest(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
+@app.head("/", response_class=HTMLResponse)
 async def serve_frontend():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        with open(index_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
     return HTMLResponse("<h2>Village Pond Backend Running. Static frontend index.html not found.</h2>")
+
 
 
 @app.post("/analyzeSelectedArea")
@@ -84,12 +90,21 @@ async def analyze_selected_area(data: MapAreaRequest):
     down_row, down_col = compute_flow_direction(dem)
     acc = compute_flow_accumulation(dem, down_row, down_col)
 
-    # 3. Recommended pond location
-    pond_row, pond_col = select_pond_site(dem, acc, down_row, down_col)
-    pond_lon, pond_lat = dem.local_to_lonlat(
-        dem.x_coords[pond_col], dem.y_coords[pond_row]
-    )
-    pond_elevation = float(dem.elevation[pond_row, pond_col])
+    # 3. Discover all candidate pond sites across the watershed
+    all_ponds = select_all_pond_sites(dem, acc, down_row, down_col, max_ponds=4, min_cell_distance=8)
+    if all_ponds:
+        primary_pond = all_ponds[0]
+        pond_lon = primary_pond["longitude"]
+        pond_lat = primary_pond["latitude"]
+        pond_elevation = primary_pond["elevation_m"]
+        pond_row = primary_pond["grid_row"]
+        pond_col = primary_pond["grid_col"]
+    else:
+        pond_row, pond_col = select_pond_site(dem, acc, down_row, down_col)
+        pond_lon, pond_lat = dem.local_to_lonlat(
+            dem.x_coords[pond_col], dem.y_coords[pond_row]
+        )
+        pond_elevation = float(dem.elevation[pond_row, pond_col])
 
     # 4. Catchment delineation
     catchment_cells = delineate_catchment(down_row, down_col, pond_row, pond_col)
@@ -103,7 +118,15 @@ async def analyze_selected_area(data: MapAreaRequest):
     water_vol = calculate_expected_water_volume(catchment_area_m2, rainfall_mm, runoff_coeff)
     pond_dims = calculate_pond_dimensions(water_vol["expected_volume_m3"])
 
+    # Attach volume calculations for each pond candidate
+    for p in all_ponds:
+        p_vol = calculate_expected_water_volume(p["catchment_area_m2"], rainfall_mm, runoff_coeff)
+        p["expected_water_volume"] = p_vol
+        p["dimensions"] = calculate_pond_dimensions(p_vol["expected_volume_m3"])
+
     elapsed = round(time.time() - start, 2)
+
+    elev_profile = extract_elevation_profile(dem, catchment_cells, pond_row, pond_col)
 
     return {
         "input_type": "interactive_map_selection",
@@ -115,6 +138,7 @@ async def analyze_selected_area(data: MapAreaRequest):
             "latitude": pond_lat,
             "elevation_m": pond_elevation,
         },
+        "all_ponds": all_ponds,
         "catchment": {
             "area_m2": round(catchment_area_m2, 2),
             "area_hectares": round(catchment_area_m2 / 10_000, 3),
@@ -122,10 +146,12 @@ async def analyze_selected_area(data: MapAreaRequest):
             "elevation_min_m": round(min(catchment_elevations), 2),
             "elevation_max_m": round(max(catchment_elevations), 2),
             "boundary_polygon_lonlat": boundary,
+            "elevation_profile": elev_profile,
         },
         "expected_water_volume": water_vol,
         "recommended_pond_dimensions": pond_dims,
     }
+
 
 
 @app.post("/analyzeContour")
@@ -163,12 +189,21 @@ async def handle_contour_request(
     down_row, down_col = compute_flow_direction(dem)
     acc = compute_flow_accumulation(dem, down_row, down_col)
 
-    # 4. Pick the recommended pond site (natural drainage convergence point)
-    pond_row, pond_col = select_pond_site(dem, acc, down_row, down_col)
-    pond_lon, pond_lat = dem.local_to_lonlat(
-        dem.x_coords[pond_col], dem.y_coords[pond_row]
-    )
-    pond_elevation = float(dem.elevation[pond_row, pond_col])
+    # 4. Pick recommended pond sites (Primary + Secondary sites)
+    all_ponds = select_all_pond_sites(dem, acc, down_row, down_col, max_ponds=4, min_cell_distance=8)
+    if all_ponds:
+        primary_pond = all_ponds[0]
+        pond_lon = primary_pond["longitude"]
+        pond_lat = primary_pond["latitude"]
+        pond_elevation = primary_pond["elevation_m"]
+        pond_row = primary_pond["grid_row"]
+        pond_col = primary_pond["grid_col"]
+    else:
+        pond_row, pond_col = select_pond_site(dem, acc, down_row, down_col)
+        pond_lon, pond_lat = dem.local_to_lonlat(
+            dem.x_coords[pond_col], dem.y_coords[pond_row]
+        )
+        pond_elevation = float(dem.elevation[pond_row, pond_col])
 
     # 5. Delineate the catchment area feeding that site
     catchment_cells = delineate_catchment(down_row, down_col, pond_row, pond_col)
@@ -184,7 +219,14 @@ async def handle_contour_request(
     water_vol = calculate_expected_water_volume(catchment_area_m2, rainfall_mm, runoff_coefficient)
     pond_dims = calculate_pond_dimensions(water_vol["expected_volume_m3"])
 
+    # Attach volume calculations for each pond candidate
+    for p in all_ponds:
+        p_vol = calculate_expected_water_volume(p["catchment_area_m2"], rainfall_mm, runoff_coefficient)
+        p["expected_water_volume"] = p_vol
+        p["dimensions"] = calculate_pond_dimensions(p_vol["expected_volume_m3"])
+
     elapsed = round(time.time() - start, 2)
+    elev_profile = extract_elevation_profile(dem, catchment_cells, pond_row, pond_col)
 
     return {
         "input_file": upload.filename,
@@ -196,6 +238,7 @@ async def handle_contour_request(
             "latitude": pond_lat,
             "elevation_m": pond_elevation,
         },
+        "all_ponds": all_ponds,
         "catchment": {
             "area_m2": round(catchment_area_m2, 2),
             "area_hectares": round(catchment_area_m2 / 10_000, 3),
@@ -203,6 +246,7 @@ async def handle_contour_request(
             "elevation_min_m": round(min(catchment_elevations), 2),
             "elevation_max_m": round(max(catchment_elevations), 2),
             "boundary_polygon_lonlat": boundary,
+            "elevation_profile": elev_profile,
         },
         "expected_water_volume": water_vol,
         "recommended_pond_dimensions": pond_dims,
