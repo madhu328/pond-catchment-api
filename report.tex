@@ -273,28 +273,28 @@ All AI-generated code snippets and report contents were thoroughly reviewed, ver
 \subsection{IIT Bhilai Cluster Port Mapping \& System Access Links}
 According to the cluster networking rules, an internal app port $P \in \{2000, 3000, 4000, 5000, 6000, 7000\}$ configured on an allocated system (IP: \texttt{10.1.75.51}, SSH Port: $2000 + \text{System\_ID}$) is mapped across the IIT Bhilai intranet at \url{http://10.1.75.51:<P + System_ID>}.
 
-Port 3000 is allocated for the \textbf{Backend REST API} (Port 3313), while Port 6000 is allocated for the \textbf{Web GIS Frontend Application} (Port 6313).
+The single-page web application architecture hosts both the interactive Web GIS interface and REST API endpoints under Port 3000 (mapped externally to Port 3313).
 
 \begin{table}[h]
-  \caption{System Access and Port Mapping Matrix (Backend API vs Frontend Web UI)}
+  \caption{System Access and Port Mapping Matrix}
   \label{tab:system_urls}
   \begin{tabular}{llll}
     \toprule
     Component & Internal Port & Mapped Intranet URL & Purpose / Service \\
     \midrule
-    \textbf{Backend Primary API} & Port 3000 & \url{http://10.1.75.51:3313/analyzeContour} & Primary KML Contour Analysis \\
-    \textbf{Backend Alias API} & Port 3000 & \url{http://10.1.75.51:3313/findCatchment} & Alias Catchment Delineation \\
-    \textbf{Backend Map API} & Port 3000 & \url{http://10.1.75.51:3313/analyzeSelectedArea} & Interactive Polygon Analysis \\
-    \textbf{Backend Swagger UI} & Port 3000 & \url{http://10.1.75.51:3313/docs} & OpenAPI / Swagger Documentation \\
-    \textbf{Frontend Web App} & Port 6000 & \url{http://10.1.75.51:6313/} & Interactive Web GIS Dashboard UI \\
+    \textbf{Web GIS Front-End URL} & Port 3000 & \url{http://10.1.75.51:3313/} & Interactive Web GIS Dashboard UI \\
+    \textbf{Primary API Endpoint} & Port 3000 & \url{http://10.1.75.51:3313/analyzeContour} & Primary KML Contour Analysis \\
+    \textbf{Alias API Endpoint} & Port 3000 & \url{http://10.1.75.51:3313/findCatchment} & Alias Catchment Delineation \\
+    \textbf{Map Selection API} & Port 3000 & \url{http://10.1.75.51:3313/analyzeSelectedArea} & Interactive Polygon Analysis \\
+    \textbf{Interactive API Docs} & Port 3000 & \url{http://10.1.75.51:3313/docs} & OpenAPI / Swagger UI \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{Working URLs Summary}
 \begin{itemize}
-    \item \textbf{Working Backend API URL:} \url{http://10.1.75.51:3313/analyzeContour}
-    \item \textbf{Working Frontend Web App URL:} \url{http://10.1.75.51:6313/} (also available locally at \url{http://localhost:6313/})
+    \item \textbf{Working Front-end Web App URL:} \url{http://10.1.75.51:3313/} (also accessible locally at \url{http://localhost:3313/})
+    \item \textbf{Working Backend API Endpoint:} \url{http://10.1.75.51:3313/analyzeContour}
 \end{itemize}
 
 \end{document}

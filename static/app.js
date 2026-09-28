@@ -20,24 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let elevationChart = null;
     let hydrographChart = null;
 
-    // Dynamic Backend API Endpoint Resolution (Backend API on port 3313, Frontend UI on port 6313)
-    function getApiBaseUrl() {
-        const port = window.location.port;
-        const host = window.location.hostname;
-        const protocol = window.location.protocol;
-        
-        if (port === '6313' || port === '6000') {
-            return `${protocol}//${host}:3313`;
-        }
-        if (port === '3313') {
-            return '';
-        }
-        if (host === '10.1.75.51' || host === 'localhost' || host === '127.0.0.1') {
-            return `${protocol}//${host}:3313`;
-        }
-        return '';
-    }
-    const API_BASE_URL = getApiBaseUrl();
+    // Relative API Base URL (FastAPI serves both Frontend SPA and REST API on port 3313)
+    const API_BASE_URL = '';
 
     // --------------------------------------------------------------------------
     // Initialize Leaflet Interactive Map
