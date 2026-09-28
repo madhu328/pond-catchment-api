@@ -259,28 +259,30 @@ All AI-generated code snippets and report contents were thoroughly reviewed, ver
 \subsection{IIT Bhilai Cluster Port Mapping \& System Access Links}
 According to the cluster networking rules, an internal app port $P \in \{2000, 3000, 4000, 5000, 6000, 7000\}$ configured on an allocated system (IP: \texttt{10.1.75.51}, SSH Port: $2000 + \text{System\_ID}$) is mapped across the IIT Bhilai intranet at \url{http://10.1.75.51:<P + System_ID>}.
 
-The deployment links for all 4 allocated student systems are provided below:
+Port 3000 is allocated for the **Backend REST API** (Port 3313), while Port 6000 is allocated for the **Web GIS Frontend Application** (Port 6313).
 
 \begin{table}[h]
 \centering
-\caption{Allocated Systems Port Mapping and Access Matrix}
+\caption{System Access and Port Mapping Matrix (Backend API vs Frontend Web UI)}
 \label{tab:system_urls}
 \vspace{0.2cm}
-\begin{tabular}{lllll}
+\begin{tabular}{llll}
 \toprule
-\textbf{System Name} & \textbf{System ID} & \textbf{SSH Command} & \textbf{App Port} & \textbf{IIT Bhilai Intranet Access URL} \\
+\textbf{Component} & \textbf{Internal Port} & \textbf{Mapped Intranet URL} & \textbf{Purpose / Service} \\
 \midrule
-\textbf{stu29\_sys1} & 313 & \texttt{ssh -p 2313 student@10.1.75.51} & 3000 / 6000 & \url{http://10.1.75.51:3313/} / \url{http://10.1.75.51:6313/} \\
-\textbf{stu29\_sys2} & 314 & \texttt{ssh -p 2314 student@10.1.75.51} & 3000 / 6000 & \url{http://10.1.75.51:3314/} / \url{http://10.1.75.51:6314/} \\
-\textbf{stu29\_sys3} & 315 & \texttt{ssh -p 2315 student@10.1.75.51} & 3000 / 6000 & \url{http://10.1.75.51:3315/} / \url{http://10.1.75.51:6315/} \\
-\textbf{stu29\_sys4} & 316 & \texttt{ssh -p 2316 student@10.1.75.51} & 3000 / 6000 & \url{http://10.1.75.51:3316/} / \url{http://10.1.75.51:6316/} \\
+\textbf{Backend Primary API} & Port 3000 & \url{http://10.1.75.51:3313/analyzeContour} & Primary KML Contour Analysis \\
+\textbf{Backend Alias API} & Port 3000 & \url{http://10.1.75.51:3313/findCatchment} & Alias Catchment Delineation \\
+\textbf{Backend Map API} & Port 3000 & \url{http://10.1.75.51:3313/analyzeSelectedArea} & Interactive Polygon Analysis \\
+\textbf{Backend Swagger UI} & Port 3000 & \url{http://10.1.75.51:3313/docs} & OpenAPI / Swagger Documentation \\
+\textbf{Frontend Web App} & Port 6000 & \url{http://10.1.75.51:6313/} & Interactive Web GIS Dashboard UI \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Global 24/7 Public HTTPS Working Frontend Link}
+\subsection{Working URLs Summary}
 \begin{itemize}
-    \item \textbf{Public 24/7 HTTPS Live Frontend URL:} \url{https://5b254c155f5286.lhr.life} (also accessible at \url{http://localhost:3313/})
+    \item \textbf{Working Backend API URL:} \url{http://10.1.75.51:3313/analyzeContour}
+    \item \textbf{Working Frontend Web App URL:} \url{http://10.1.75.51:6313/} (also available locally at \url{http://localhost:6313/})
 \end{itemize}
 
 \end{document}
