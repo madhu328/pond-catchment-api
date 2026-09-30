@@ -9,8 +9,7 @@ import os
 import time
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -45,26 +44,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure static directory exists and mount static files
-STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
 class MapAreaRequest(BaseModel):
     polygon_lonlat: List[List[float]]
     rainfall_mm: Optional[float] = 1000.0
     runoff_coefficient: Optional[float] = 0.35
 
+@app.get("/")
+@app.head("/")
+async def root_route():
+    """Returns API service status and endpoint overview."""
+    return {
+        "status": "online",
+        "service": "Village Pond Catchment & Hydrological Analysis API",
+        "version": "0.2.0",
+        "docs_url": "/docs",
+        "endpoints": [
+            {"path": "/analyzeSelectedArea", "method": "POST", "description": "D8 hydrological terrain analysis on polygon coordinates"},
+            {"path": "/analyzeContour", "method": "POST", "description": "Analyze uploaded contour map (KML/KMZ)"},
+            {"path": "/findCatchment", "method": "POST", "description": "Alias endpoint for contour catchment analysis"},
+            {"path": "/api/v1/health", "method": "GET", "description": "Service health check"}
+        ]
+    }
 
-@app.get("/", response_class=HTMLResponse)
-@app.head("/", response_class=HTMLResponse)
-async def serve_frontend():
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse("<h2>Village Pond Backend Running. Static frontend index.html not found.</h2>")
+@app.get("/api/v1/health")
+@app.get("/health")
+async def api_health():
+    return {"status": "ok", "service": "pond_catchment_backend"}
 
 
 

@@ -2,3 +2,8 @@ venv/
 __pycache__/
 *.pyc
 .env
+.ssh_key
+.ssh_key.pub
+*.log
+/tmp/
+.system_generated/

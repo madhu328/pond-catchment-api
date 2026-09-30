@@ -20,8 +20,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let elevationChart = null;
     let hydrographChart = null;
 
-    // Relative API Base URL (FastAPI serves both Frontend SPA and REST API on port 3313)
-    const API_BASE_URL = '';
+    // Dynamically detect the Backend API URL
+    // stu29_sys2: Frontend on port 3000 (accessible locally via 3314) connects to Backend on port 4000 (accessible locally via 4314)
+    let API_BASE_URL = window.location.origin;
+    if (window.location.port) {
+        const portNum = parseInt(window.location.port, 10);
+        if (portNum === 3314) {
+            API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4314`;
+        } else if (portNum === 3000) {
+            API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+        } else if (portNum === 6314) {
+            API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4314`;
+        } else if (portNum >= 7000 && portNum < 8000) {
+            const backendPort = portNum - 3000;
+            API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:${backendPort}`;
+        } else if (portNum >= 6000 && portNum < 7000) {
+            const backendPort = portNum - 3000;
+            API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:${backendPort}`;
+        }
+    }
 
     // --------------------------------------------------------------------------
     // Initialize Leaflet Interactive Map
@@ -354,11 +371,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Robust Multi-URL API Poster (Tries relative, API_BASE_URL, and direct ports)
+    async function postApiData(endpointPath, payloadOrFormData, isFormData = false) {
+        const urlsToTry = [
+            endpointPath, // relative path goes through frontend proxy directly!
+            `${API_BASE_URL}${endpointPath}`,
+            `${window.location.protocol}//${window.location.hostname}:4314${endpointPath}`,
+            `http://10.1.75.51:4314${endpointPath}`,
+            `http://localhost:4000${endpointPath}`,
+            `http://127.0.0.1:4000${endpointPath}`
+        ];
+
+        let lastError = null;
+        for (const url of urlsToTry) {
+            try {
+                const options = { method: 'POST' };
+                if (isFormData) {
+                    options.body = payloadOrFormData;
+                } else {
+                    options.headers = { 'Content-Type': 'application/json' };
+                    options.body = JSON.stringify(payloadOrFormData);
+                }
+                const res = await fetch(url, options);
+                if (res.ok) {
+                    return await res.json();
+                }
+                lastError = new Error(`HTTP ${res.status}`);
+            } catch (err) {
+                lastError = err;
+            }
+        }
+        throw lastError || new Error('Failed to connect to analysis server');
+    }
+
     // --------------------------------------------------------------------------
     // Core Analysis API Call
     // --------------------------------------------------------------------------
     async function runAnalysis() {
-        const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+        const activeTabBtn = document.querySelector('.tab-btn.active');
+        const activeTab = activeTabBtn ? activeTabBtn.getAttribute('data-tab') : 'drawMode';
         const rainfall = parseFloat(document.getElementById('rainfallRange').value);
         const runoff = parseFloat(document.getElementById('runoffCoeffSelect').value);
 
@@ -374,12 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('rainfall_mm', rainfall);
                 formData.append('runoff_coefficient', runoff);
 
-                const res = await fetch(`${API_BASE_URL}/analyzeContour`, {
-                    method: 'POST',
-                    body: formData
-                });
-                if (!res.ok) throw new Error(await res.text());
-                responseData = await res.json();
+                responseData = await postApiData('/analyzeContour', formData, true);
             } else {
                 // Interactive Polygon or Preset Polygon
                 const poly = currentDrawnPolygon || [
@@ -396,13 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     runoff_coefficient: runoff
                 };
 
-                const res = await fetch(`${API_BASE_URL}/analyzeSelectedArea`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!res.ok) throw new Error(await res.text());
-                responseData = await res.json();
+                responseData = await postApiData('/analyzeSelectedArea', payload, false);
             }
 
             activeAnalysisData = responseData;
