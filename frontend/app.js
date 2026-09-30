@@ -44,6 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Leaflet Interactive Map
     // --------------------------------------------------------------------------
     function initMap() {
+        if (typeof L === 'undefined') {
+            throw new Error('Leaflet library (L) is not loaded.');
+        }
+
+        // Configure local Leaflet default marker icons to avoid CDN lookups or 404s
+        if (L.Icon && L.Icon.Default) {
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'vendor/images/marker-icon-2x.png',
+                iconUrl: 'vendor/images/marker-icon.png',
+                shadowUrl: 'vendor/images/marker-shadow.png',
+            });
+        }
+
         // Centered around Raipur / Durg Chhattisgarh sample region
         const defaultCenter = [21.2461, 81.2893];
         const defaultZoom = 14;
@@ -57,9 +71,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add zoom control top right
         L.control.zoom({ position: 'topright' }).addTo(map);
 
-        // Basemap Layers
+        // Basemap Layers with reliable fallback
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Esri World Imagery',
+            maxZoom: 19
+        });
+
+        const streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
             maxZoom: 19
         });
 
@@ -73,61 +92,64 @@ document.addEventListener('DOMContentLoaded', () => {
             maxZoom: 19
         });
 
-        const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-            maxZoom: 19
-        });
-
         baseLayers = {
             satellite: satelliteLayer,
+            streets: streetLayer,
             topo: topoLayer,
-            dark: darkLayer,
-            streets: streetLayer
+            dark: darkLayer
         };
 
-        // Set default satellite basemap
+        // Add default satellite basemap
         satelliteLayer.addTo(map);
 
-        // Initialize Leaflet Geoman Drawing Controls
-        map.pm.addControls({
-            position: 'topleft',
-            drawPolygon: true,
-            drawRectangle: true,
-            drawCircleMarker: false,
-            drawCircle: false,
-            drawPolyline: false,
-            drawMarker: false,
-            editMode: true,
-            dragMode: false,
-            cutPolygon: false,
-            removalMode: true
+        satelliteLayer.on('tileerror', function() {
+            console.warn('Esri satellite tile fetch error - verify network connectivity.');
         });
 
-        // Handle drawn polygons
-        map.on('pm:create', (e) => {
-            const layer = e.layer;
-            if (selectedLandPolygonLayer) {
-                map.removeLayer(selectedLandPolygonLayer);
-            }
-            selectedLandPolygonLayer = layer;
+        // Initialize Leaflet Geoman Drawing Controls safely
+        if (map.pm && typeof map.pm.addControls === 'function') {
+            map.pm.addControls({
+                position: 'topleft',
+                drawPolygon: true,
+                drawRectangle: true,
+                drawCircleMarker: false,
+                drawCircle: false,
+                drawPolyline: false,
+                drawMarker: false,
+                editMode: true,
+                dragMode: false,
+                cutPolygon: false,
+                removalMode: true
+            });
 
-            // Extract coordinates
-            const latlngs = layer.getLatLngs()[0];
-            currentDrawnPolygon = latlngs.map(pt => [pt.lng, pt.lat]);
-            // Close polygon loop if needed
-            if (currentDrawnPolygon[0][0] !== currentDrawnPolygon[currentDrawnPolygon.length - 1][0]) {
-                currentDrawnPolygon.push([...currentDrawnPolygon[0]]);
-            }
+            // Handle drawn polygons
+            map.on('pm:create', (e) => {
+                const layer = e.layer;
+                if (selectedLandPolygonLayer) {
+                    map.removeLayer(selectedLandPolygonLayer);
+                }
+                selectedLandPolygonLayer = layer;
 
-            updateDrawStatus(true, currentDrawnPolygon.length - 1);
-            showToast('Land area polygon captured! Click "Run Catchment Analysis" to analyze.', 'success');
-        });
+                // Extract coordinates
+                const latlngs = layer.getLatLngs()[0];
+                currentDrawnPolygon = latlngs.map(pt => [pt.lng, pt.lat]);
+                // Close polygon loop if needed
+                if (currentDrawnPolygon[0][0] !== currentDrawnPolygon[currentDrawnPolygon.length - 1][0]) {
+                    currentDrawnPolygon.push([...currentDrawnPolygon[0]]);
+                }
 
-        map.on('pm:remove', (e) => {
-            currentDrawnPolygon = null;
-            selectedLandPolygonLayer = null;
-            updateDrawStatus(false);
-        });
+                updateDrawStatus(true, currentDrawnPolygon.length - 1);
+                showToast('Land area polygon captured! Click "Run Catchment Analysis" to analyze.', 'success');
+            });
+
+            map.on('pm:remove', (e) => {
+                currentDrawnPolygon = null;
+                selectedLandPolygonLayer = null;
+                updateDrawStatus(false);
+            });
+        } else {
+            console.warn('Leaflet Geoman drawing controls not available.');
+        }
 
         // Live Cursor Coordinates Tracker
         map.on('mousemove', (e) => {
@@ -139,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Click on map to inspect coordinates
         map.on('click', (e) => {
-            if (map.pm.globalDrawModeEnabled()) return;
+            if (map.pm && typeof map.pm.globalDrawModeEnabled === 'function' && map.pm.globalDrawModeEnabled()) return;
             if (clickInspectMarker) map.removeLayer(clickInspectMarker);
 
             const clickIcon = L.divIcon({
@@ -159,7 +181,18 @@ document.addEventListener('DOMContentLoaded', () => {
             `).openPopup();
         });
 
-        showToast('Map initialized. Auto-generating terrain flow analysis...', 'info');
+        // Multiple invalidateSize passes to guarantee crisp Leaflet rendering inside CSS flexbox
+        [100, 300, 700, 1500].forEach(delay => {
+            setTimeout(() => {
+                if (map) map.invalidateSize(true);
+            }, delay);
+        });
+
+        window.addEventListener('resize', () => {
+            if (map) map.invalidateSize();
+        });
+
+        showToast('Map ready. Auto-generating terrain flow analysis...', 'info');
     }
 
     // --------------------------------------------------------------------------
@@ -708,6 +741,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chart.js Visualizations
     // --------------------------------------------------------------------------
     function renderCharts(data) {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not loaded, skipping chart rendering.');
+            return;
+        }
+
         const catchment = data.catchment;
         const minE = catchment.elevation_min_m || 268;
         const maxE = catchment.elevation_max_m || 285;
@@ -869,12 +907,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initialize Map, UI, and Auto-Run Initial Terrain Analysis
-    initMap();
-    initUI();
+    // Robust Application Bootstrapping Sequence
+    let initRetries = 0;
+    function startApplication() {
+        if (typeof L === 'undefined') {
+            initRetries++;
+            if (initRetries < 25) {
+                setTimeout(startApplication, 100);
+                return;
+            }
+            console.error('Leaflet library failed to load.');
+            showToast('Warning: Leaflet library failed to load. Check local vendor assets.', 'error');
+            try { initUI(); } catch (e) { console.error('UI init error:', e); }
+            return;
+        }
 
-    // Auto-run analysis on page load so pond marker pointer & catchment area are instantly visible
-    setTimeout(() => {
-        runAnalysis();
-    }, 500);
+        try {
+            initMap();
+        } catch (err) {
+            console.error('Map init error:', err);
+            showToast('Map initialization error: ' + err.message, 'error');
+        }
+
+        try {
+            initUI();
+        } catch (err) {
+            console.error('UI init error:', err);
+        }
+
+        // Auto-run analysis on page load so pond marker pointer & catchment area are instantly visible
+        setTimeout(() => {
+            try {
+                runAnalysis();
+            } catch (err) {
+                console.error('Initial analysis error:', err);
+            }
+        }, 500);
+    }
+
+    startApplication();
 });

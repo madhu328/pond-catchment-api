@@ -31,6 +31,7 @@ PROXY_PREFIXES = (
 )
 
 class FrontendAndProxyHandler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
     backend_url = DEFAULT_BACKEND
 
     def end_headers(self):
@@ -42,6 +43,7 @@ class FrontendAndProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def _should_proxy(self):
@@ -63,25 +65,30 @@ class FrontendAndProxyHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
+                resp_data = resp.read()
                 self.send_response(resp.status)
                 for k, v in resp.headers.items():
-                    if k.lower() not in ("transfer-encoding", "content-encoding", "access-control-allow-origin"):
+                    if k.lower() not in ("transfer-encoding", "content-encoding", "access-control-allow-origin", "content-length"):
                         self.send_header(k, v)
+                self.send_header("Content-Length", str(len(resp_data)))
                 self.end_headers()
-                self.wfile.write(resp.read())
+                self.wfile.write(resp_data)
         except urllib.error.HTTPError as e:
+            resp_data = e.read()
             self.send_response(e.code)
             for k, v in e.headers.items():
-                if k.lower() not in ("transfer-encoding", "content-encoding", "access-control-allow-origin"):
+                if k.lower() not in ("transfer-encoding", "content-encoding", "access-control-allow-origin", "content-length"):
                     self.send_header(k, v)
+            self.send_header("Content-Length", str(len(resp_data)))
             self.end_headers()
-            self.wfile.write(e.read())
+            self.wfile.write(resp_data)
         except Exception as err:
             self.send_response(502)
             self.send_header("Content-Type", "application/json")
+            err_msg = f'{{"error": "Backend gateway error", "detail": "{str(err)}"}}'.encode('utf-8')
+            self.send_header("Content-Length", str(len(err_msg)))
             self.end_headers()
-            err_msg = f'{{"error": "Backend gateway error", "detail": "{str(err)}"}}'
-            self.wfile.write(err_msg.encode())
+            self.wfile.write(err_msg)
 
     def do_GET(self):
         if self._should_proxy():
